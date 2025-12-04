@@ -4,24 +4,21 @@ var input = fs.readFileSync('./input.txt', 'utf8').split('\r\n').map(n => n.spli
 
 var total = 0;
 
-var cache = {};
-
 function findMax(bi, b, pos, left) {
-    if (cache[bi+','+pos+','+left]) {
-        return cache[bi+','+pos+','+left];
-    }
     if (left == 0) {
-        cache[bi+','+pos+','+left] = 0;
         return 0;
     }
     var bestScore = 0;
+    var index = pos;
     for(var i = pos; i <= b.length-left; i++) {
-        var score = (Math.pow(10, left-1) * b[i]) + findMax(bi, b, i+1, left-1);
+        var score = b[i];
         if (score > bestScore) {
             bestScore = score;
+            index = i;
         }
     }
-    cache[bi+','+pos+','+left] = bestScore;
+    bestScore *= Math.pow(10, left-1);
+    bestScore += findMax(bi, b, index+1, left-1)
     return bestScore;
 }
 
