@@ -3,26 +3,39 @@ var fs = require('fs');
 var input = fs.readFileSync('./input.txt', 'utf8').split('\r\n').map(n => n.split(''));
 
 function increment(x, y, amount) {
-    if (amount == 'S') {
-        amount = 1;
+    if (amount == 0) {
+        return;
     }
-    if (input[y][x] == '.') {
-        input[y][x] = amount;
-    } else {
-        input[y][x] += amount;
+    switch(input[y][x]) {
+        case '^':
+            increment(x-1, y, amount);
+            increment(x+1, y, amount);
+            return;
+        case '.':
+            input[y][x] = amount;
+            return;
+        default: 
+            input[y][x] += amount;
+            return;
+    }
+}
+
+function getValue(x, y) {
+    switch(input[y][x]) {
+        case 'S':
+            return 1;
+        case '.':
+            return 0;
+        case '^':
+            return 0;
+        default:
+            return input[y][x];
     }
 }
 
 for(var y = 1; y < input.length; y++) {
     for (var x = 0; x < input[0].length; x++) {
-        if (input[y-1][x] != '.' && input[y-1][x] != '^') {
-            if (input[y][x] == '^') {
-                increment(x-1, y, input[y-1][x]);
-                increment(x+1, y, input[y-1][x])
-            } else {
-                increment(x, y, input[y-1][x]);
-            }
-        }
+        increment(x, y, getValue(x, y-1));
     }
 }
 
