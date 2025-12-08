@@ -35,18 +35,19 @@ for(var j = 0; j < input.length; j++) {
     connections[j] = { parent: j, size: 1 };
 }
 
-function link(first, second) {
-    var firstObj = connections[first];
-    while (first != firstObj.parent) {
-        first = firstObj.parent;
-        firstObj = connections[first];
+function root(id) {
+    var o = connections[id];
+    if (id != o.parent) {
+        var top = root(o.parent);
+        o.parent = top.parent;
+        return top;
     }
+    return o;
+}
 
-    var secondObj = connections[second];
-    while (second != secondObj.parent) {
-        second = secondObj.parent;
-        secondObj = connections[second];
-    }
+function link(a, b) {
+    var firstObj = root(a);
+    var secondObj = root(b);
 
     if (firstObj.parent != secondObj.parent) {
         if (firstObj.size > secondObj.size) {
@@ -58,6 +59,7 @@ function link(first, second) {
         }
     }
 }
+
 
 for(var d = 0; d < num; d++) {
     var c1 = distances[d].j1;

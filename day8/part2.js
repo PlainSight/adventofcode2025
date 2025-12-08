@@ -35,9 +35,10 @@ for(var j = 0; j < input.length; j++) {
 
 function root(id) {
     var o = connections[id];
-    while (id != o.parent) {
-        id = o.parent;
-        o = connections[id];
+    if (id != o.parent) {
+        var top = root(o.parent);
+        o.parent = top.parent;
+        return top;
     }
     return o;
 }
