@@ -100,17 +100,15 @@ function checkInBounds(x0, y0, x1, y1) {
     var yi0 = Math.min(horiIndices[y0], horiIndices[y1]);
     var yi1 = Math.max(horiIndices[y0], horiIndices[y1]);
 
-    var good = true;
-
     for(var x = xi0; x < xi1; x++) {
         for(var y = yi0; y < yi1; y++) {
             if(!inGrid[k(x, y)]) {
-                good = false;
+                return false;
             }
         }
     }
 
-    return good;
+    return true;
 }
 
 for(var i = 0; i < input.length-1; i++) {
@@ -120,7 +118,7 @@ for(var i = 0; i < input.length-1; i++) {
 
         var area = (Math.abs(a[0]-b[0])+1) * (Math.abs(a[1]-b[1])+1);
 
-        if (checkInBounds(a[0], a[1], b[0], b[1]) && area > largestArea) {
+        if (area > largestArea && checkInBounds(a[0], a[1], b[0], b[1])) {
             largestArea = area;
         }
     }
