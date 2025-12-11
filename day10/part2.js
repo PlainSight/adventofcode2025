@@ -8,11 +8,27 @@ var problems = input.map(i => {
     var joltageReqs = parts[3].split(',').map(n => parseInt(n));
     return {
         wirings: buttonWirings.map(n => n.split(',').map(x => parseInt(x))),
-        joltages: joltageReqs,
-        best: Number.MAX_SAFE_INTEGER,
-        cache: {}
+        joltages: joltageReqs
     }
 });
+
+problems.forEach(p => {
+    p.related = p.joltages.map((j, ji) => {
+        return {
+            relatedButtons: p.wirings.map((w, wi) => w.includes(ji) ? wi : null).filter(x => x != null),
+            max: j
+        }
+    });
+
+    // for each value we can calculate the maximum number of presses for a set of buttons
+});
+
+function remainderWillCap(i, pos, pushes) {
+    problems[i].related[pos].forEach(r => [
+        // if buttons are pushed which are related to this position then we must check if is possible to get the counter to the correct position without overflowing the related positions
+
+    ])
+}
 
 // need to do some kind of n dimensional path finding or something 
 // actually maybe a big simultaneous equation
@@ -46,96 +62,98 @@ function search(i) {
     }
 
     var heap = [{
-        v: distance(i, []),
-        pushes: []
+        pushes: problems[i].wirings.map(() => 0)
     }];
 
     var saw = 0;
 
+    console.log(problems[i].related);
+
     var solution = Number.MAX_SAFE_INTEGER;
 
     while (heap.length) {
+        heap.sort((a, b) => b.v - a.v);
         saw++;
         var top = heap.pop();
 
-        if (top.v == 0) {
+        var topDist = distance(i, top.pushes);
+
+        if (topDist == 0) {
             //done
 
             var score = pushCount(top.pushes);
             if (score < solution) {
-                console.log('FOUND', top, score);
                 solution = score;
+                console.log(top.pushes);
             }
         }
-        
-        if (top.pushes.length == problems[i].wirings.length) {
-            continue;
-        }
 
-        var lastValid = true;
-        var count = 0;
-        while(lastValid) {
-            var newPushes = clone(top.pushes);
-            newPushes.push(count);
-            count++;
+        // find cheap tricks
 
-            var dist = distance(i, newPushes);
-            var pc = pushCount(newPushes);
+        var applicableSuggesions = problems[i].related.filter(f => f.relatedButtons.length == 2);
 
-            var k = key(value(i, newPushes));
+        applicableSuggesions = applicableSuggesions.filter(s => {
+            return top.pushes.reduce((a, c, ci) => { return a + s.relatedButtons.includes(ci) ? c : 0 }, 0) < s.max
+        });
 
-            if (dist <= top.v && ((!seen[k]) || pc <= seen[k])) {
+        var buttonMinMaxes = applicableSuggesions.map(as => {
+            var existantClicks = as.relatedButtons.reduce((a, c) => {
+                return a + top.pushes[c];
+            }, 0);
+            return {
+                buttons: as.relatedButtons,
+                count: as.max - existantClicks
+            };
+        });
+
+        function enqueue(pushes) {
+            var dist = distance(i, pushes);
+            var pc = pushCount(pushes);
+            var k = key(value(i, pushes));
+
+            if (dist < topDist && (!seen[k] || pc < seen[k]) && pc < solution) {
                 heap.push({
                     v: dist,
-                    pushes: newPushes
+                    pushes: pushes
                 });
                 seen[k] = pc;
-            } else {
-                lastValid = false;
             }
         }
+
+        //console.log('reo', top.pushes, value(i, top.pushes), problems[i], applicableSuggesions, buttonMinMaxes);
+
+        buttonMinMaxes.forEach(mm => {
+            for(var j = 0; j < mm.count; j++) {
+                var jj = mm.count - j;
+
+                var newPushes = clone(top.pushes);
+                newPushes[mm.buttons[0]] += j;
+                newPushes[mm.buttons[1]] += jj;
+
+                //console.log('SC', top.pushes, newPushes);
+
+                enqueue(newPushes);
+            }
+        });
+
+        for(var j = 0; j < top.pushes.length; j++) {
+            var newPushes = clone(top.pushes);
+            newPushes[j]++;
+
+            enqueue(newPushes);
+        }
     }
+
+    console.log('SOLUTION', i, saw)
 
     return solution;
 }
 
-// function leastPushes(index, pushes, index) {
-//     var prob = problems[index];
-
-//     if (pushes >= prob.best || prob.cache[state] < pushes) {
-//         return Number.MAX_SAFE_INTEGER;
-//     } else {
-//         prob.cache[state] = pushes;
-//     }
-
-//     if (check(prob.lights, state)) {
-//         prob.cache[state] = pushes;
-//         if (pushes < prob.best) {
-//             prob.best = pushes;
-//         }
-//         return pushes;
-//     }
-
-//     var low = Number.MAX_SAFE_INTEGER;
-
-//     prob.wirings.forEach((w, wi) => {
-//         if (wi != lastButton) {
-//             var newState = act(state, w);
-//             var amount = leastPushes(index, newState, wi, pushes+1);
-//             if (amount < low) {
-//                 low = amount;
-//             }
-//         }
-//     });
-
-//     return low;
-// };
-
 var total = 0;
 
 for(var i = 0; i < problems.length; i++) {
-    total += search(i);
-    console.log(i, total);
+    var v = search(i);
+    total += v;
 }
 
 console.log(total);
