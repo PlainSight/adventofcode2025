@@ -153,6 +153,7 @@ var total = 0;
 
 for(var i = 0; i < problems.length; i++) {
     var v = search(i);
+    console.log(v);
     total += v;
 }
 
