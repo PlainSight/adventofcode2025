@@ -57,7 +57,7 @@ function distance(i, pushes) {
     }, 0);
 }
 
-var cache = {};
+var searches = 0;
 var best = {};
 function key(buttons) {
     return buttons.map(b => b.join(',')).join(':');
@@ -65,12 +65,7 @@ function key(buttons) {
 
 function search(i, buttons) {
     var newButtons = calculateRanges(i, buttons);
-
-    var k = key(newButtons);
-    if (cache[k]) {
-        return Number.MAX_SAFE_INTEGER;
-    }
-    cache[k] = true;
+    searches++;
 
     if (newButtons.some(b => b[0] > b[1])) {
         return Number.MAX_SAFE_INTEGER;
@@ -78,36 +73,47 @@ function search(i, buttons) {
 
     var maxSingleDistance = value(i, newButtons).map((v, vi) => problems[i].joltages[vi] - v).reduce((a, c) => a > c ? a : c, 0);
 
-    var minPushes = newButtons.reduce((a, c) => a + c[0], 0) + maxSingleDistance;
+    var minPushes = newButtons.reduce((a, c) => a + c[0], 0);
 
-    if (minPushes >= (best[i] || Number.MAX_SAFE_INTEGER)) {
+    if ((minPushes + maxSingleDistance) >= (best[i] || Number.MAX_SAFE_INTEGER)) {
         return Number.MAX_SAFE_INTEGER;
     }
 
     if (newButtons.every(b => b[0] == b[1])) {
         // found a solution or dead end
-        if (distance(i, newButtons) == 0) {
-            if (minPushes < (best[i] || Number.MAX_SAFE_INTEGER)) {
-                best[i] = minPushes;
-                console.log(i, minPushes);
-            }
-            return minPushes;
-        } else {
-            return Number.MAX_SAFE_INTEGER;
+        if (minPushes < (best[i] || Number.MAX_SAFE_INTEGER)) {
+            best[i] = minPushes;
+            console.log(i, minPushes);
         }
+        return minPushes;
     }
 
     // var selection = newButtons.map((nb, nbi) => { return { i: nbi, v: nb[1]-nb[0] } }).filter(x => x.v > 0);
     // var bi = selection[Math.floor(Math.random()*selection.length)].i;
 
+    // var bi = 0;
+    // newButtons.forEach((nb, nbi) => {
+    //     var existingDiff = (newButtons[bi][1] - newButtons[bi][0]);
+    //     var newDiff = (nb[1] - nb[0]);
+    //     if (existingDiff == 0) {
+    //         bi = nbi;
+    //     } else {
+    //         if (newDiff > 0 && newDiff < existingDiff) {
+    //             bi = nbi;
+    //         }
+    //     }
+    // });
+
     var bi = 0;
     newButtons.forEach((nb, nbi) => {
         var existingDiff = (newButtons[bi][1] - newButtons[bi][0]);
+        var existingButtonCount = problems[i].wirings[bi].length;
         var newDiff = (nb[1] - nb[0]);
+        var newButtonCount = problems[i].wirings[nbi].length;
         if (existingDiff == 0) {
             bi = nbi;
         } else {
-            if (newDiff > 0 && newDiff < existingDiff) {
+            if (newDiff > 0 && newButtonCount > existingButtonCount) {
                 bi = nbi;
             }
         }
@@ -137,8 +143,6 @@ function search(i, buttons) {
     return res2;
 }
 
-var total = 0;
-
 function calculateRanges(i, r) {
     var ranges = r.map(m => m.map(n => n));
     var lastHadChanges = true;
@@ -160,13 +164,16 @@ function calculateRanges(i, r) {
     return ranges;
 }
 
+var total = 0;
+
 for(var i = 0; i < problems.length; i++) {
-    cache = {};
+    searches = 0;
     var buttons = calculateRanges(i, problems[i].wirings.map(() => [0, Number.MAX_SAFE_INTEGER]));
     console.log('init', i, buttons.length, buttons);
 
     var v = search(i, buttons);
     console.log('ANSWER', i, v);
+    console.log('STATS searches:', searches);
     total += v;
 }
 
