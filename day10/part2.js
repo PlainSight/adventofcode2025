@@ -50,24 +50,14 @@ function value(i, pushes) {
     });
 }
 
-function distance(i, pushes) {
-    var val = value(i, pushes);
-    return val.reduce((a, c, ci) => {
-        return a + (c <= problems[i].joltages[ci] ? problems[i].joltages[ci] - c : Number.MAX_SAFE_INTEGER);
-    }, 0);
-}
-
 var searches = 0;
 var best = {};
-function key(buttons) {
-    return buttons.map(b => b.join(',')).join(':');
-}
 
 function search(i, buttons) {
-    var newButtons = calculateRanges(i, buttons);
+    var [newButtons, newButtonsValid] = calculateRanges(i, buttons);
     searches++;
 
-    if (newButtons.some(b => b[0] > b[1])) {
+    if (!newButtonsValid) {
         return Number.MAX_SAFE_INTEGER;
     }
 
@@ -88,34 +78,21 @@ function search(i, buttons) {
         return minPushes;
     }
 
-    // var selection = newButtons.map((nb, nbi) => { return { i: nbi, v: nb[1]-nb[0] } }).filter(x => x.v > 0);
-    // var bi = selection[Math.floor(Math.random()*selection.length)].i;
-
-    // var bi = 0;
-    // newButtons.forEach((nb, nbi) => {
-    //     var existingDiff = (newButtons[bi][1] - newButtons[bi][0]);
-    //     var newDiff = (nb[1] - nb[0]);
-    //     if (existingDiff == 0) {
-    //         bi = nbi;
-    //     } else {
-    //         if (newDiff > 0 && newDiff < existingDiff) {
-    //             bi = nbi;
-    //         }
-    //     }
-    // });
+    function sortingValue(bi) {
+        if (newButtons[bi][1] - newButtons[bi][0] == 0) {
+            return 0;
+        }
+        // return number of connections for button x button range
+        return problems[i].wirings[bi].length * (newButtons[bi][1] - newButtons[bi][0]);
+    }
 
     var bi = 0;
+    var bestValue = -1;
     newButtons.forEach((nb, nbi) => {
-        var existingDiff = (newButtons[bi][1] - newButtons[bi][0]);
-        var existingButtonCount = problems[i].wirings[bi].length;
-        var newDiff = (nb[1] - nb[0]);
-        var newButtonCount = problems[i].wirings[nbi].length;
-        if (existingDiff == 0) {
+        var val = sortingValue(nbi);
+        if (val > bestValue) {
+            bestValue = val;
             bi = nbi;
-        } else {
-            if (newDiff > 0 && newButtonCount > existingButtonCount) {
-                bi = nbi;
-            }
         }
     });
 
@@ -161,14 +138,14 @@ function calculateRanges(i, r) {
         })
         lastHadInvalid = ranges.some(r => r[0] > r[1]);
     }
-    return ranges;
+    return [ranges, !lastHadInvalid];
 }
 
 var total = 0;
 
 for(var i = 0; i < problems.length; i++) {
     searches = 0;
-    var buttons = calculateRanges(i, problems[i].wirings.map(() => [0, Number.MAX_SAFE_INTEGER]));
+    var [buttons, _] = calculateRanges(i, problems[i].wirings.map(() => [0, Number.MAX_SAFE_INTEGER]));
     console.log('init', i, buttons.length, buttons);
 
     var v = search(i, buttons);
