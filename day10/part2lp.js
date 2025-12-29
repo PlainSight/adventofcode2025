@@ -23,20 +23,20 @@ problems.forEach(p => {
     // for each value we can calculate the maximum number of presses for a set of buttons
 });
 
-function subtract(r1, r2, mult = 1) {
+function subtract(r1, r2, mult) {
     // subtract r2 from r1
     return r1.map((v, i) => {
-        return v - (mult*r2[i]);
+        return fsub(v, fmult(mult, r2[i]));
     })
 }
 
 function multiply(r1, mult) {
-    return r1.map(v => v * mult);
+    return r1.map(v => fmult(v, mult));
 }
 
 function eliminate(r1, r2, pos) {
     // r2 must be a pre-eliminated row with r2[pos] == 1
-    if (r1[pos] != 0) {
+    if (nonZero(r1[pos])) {
         var mult = r1[pos];
         return subtract(r1, r2, mult);
     } else {
@@ -44,7 +44,7 @@ function eliminate(r1, r2, pos) {
     }
 }
 
-function maxForFreeValues(formula, index) {
+function maxForFreeValues(formula, values, index) {
     var releventFormula = formula.filter(rr => rr[index] != 0);
     var maxValue = Number.MAX_SAFE_INTEGER;
 
@@ -58,36 +58,6 @@ function maxForFreeValues(formula, index) {
     return Math.round(maxValue);
 }
 
-function rangeOfValueGivenValues(rowReduced, index) {
-    var releventFormula = rowReduced.filter(rr => rr[index] != 0);
-    var maxValue = Number.MAX_SAFE_INTEGER;
-
-    releventFormula.forEach(rf => {
-        var coefficient = rf[index];
-
-        var right = rf[rf.length-1];
-        var value = right / coefficient;
-        if (value >= 0 && value < maxValue) {
-            maxValue = value;
-        }
-    });
-
-    if (maxValue == Number.MAX_SAFE_INTEGER) {
-        console.log(releventFormula, index);
-
-        return 0;
-    }
-
-    return Math.round(maxValue);
-}
-
-function printMath(formula, variables, pos, value) {
-    console.log('button', pos,' = ', formula[formula.length-1] + 
-        ' - (' + 
-        formula.slice(pos, -1).map((f, fi) => f + '*' + variables[parseInt(pos) + fi]).join(' + ') 
-        + ') = ' + value);
-}
-
 function calculateDependentVariables(formulaByVariable, variables) {
     var keys = Object.keys(formulaByVariable);
 
@@ -96,13 +66,11 @@ function calculateDependentVariables(formulaByVariable, variables) {
         var formula = formulaByVariable[k];
 
         var otherLeft = formula.slice(0, -1).reduce((a, c, ci) => {
-            return a + c * variables[ci];
-        }, 0);
+            return fadd(a, fmult(c, frac(variables[ci])));
+        }, frac(0));
         var right = formula[formula.length-1];
-        var allRight = right - otherLeft;
-        var value = allRight;
-
-        //printMath(formula, variables, k, value);
+        var allRight = fsub(right, otherLeft);
+        var value = fval(allRight);
 
         variables[k] = value;
     }
@@ -118,29 +86,11 @@ function evaluate(i, formulaByVariable, freeVariables) {
     if (variables.some(v => v < 0) || variables.some(v => v != Math.round(v))) {
         return Number.MAX_SAFE_INTEGER;
     }
-    console.log('good values', variables);
 
     var pushes = variables.reduce((a, c) => a + c, 0);
 
-    var good = true;
-
-    problems[i].related.forEach(r => {
-        var left = r.relatedButtons.reduce((a, b, bi) => {
-            return a + b*variables[bi];
-        }, 0);
-        var right = r.max;
-        if (left != right) {
-            console.log('left', left, 'right', right, r);
-            good = false;
-        }
-    });
-
-    if (good) {
-        console.log('ans', i, pushes);
-        return pushes;
-    } else {
-        return Number.MAX_SAFE_INTEGER;
-    }
+    console.log('ans', i, pushes);
+    return pushes;
 }
 
 function frac(a) {
@@ -150,7 +100,7 @@ function frac(a) {
     };
 }
 
-function mult(a, b) {
+function fmult(a, b) {
     var res = { 
         n: a.n * b.n,
         d: a.d * b.d
@@ -158,7 +108,19 @@ function mult(a, b) {
     return simplify(res); 
 }
 
-function sub(a, b) {
+function fadd(a, b) {
+    var res = {
+        n: (b.d*a.n) + (a.d*b.n),
+        d: a.d * b.d
+    };
+    return simplify(res);
+}
+
+function fval(a) {
+    return a.n / a.d;
+}
+
+function fsub(a, b) {
     var res = {
         n: (b.d*a.n) - (a.d*b.n),
         d: a.d * b.d
@@ -166,8 +128,23 @@ function sub(a, b) {
     return simplify(res);
 }
 
+function inv(a) {
+    return {
+        n: a.d,
+        d: a.n
+    }
+}
+
+function isZero(a) {
+    return a.n == 0;
+}
+
 function isOne(a) {
     return (a.n == 1 && a.d == 1);
+}
+
+function nonZero(a) {
+    return (a.n != 0);
 }
 
 function simplify(a) {
@@ -189,19 +166,17 @@ function solve(i) {
         return [...p.relatedButtons, p.max];
     });
 
-    console.log(formula);
-
     var rowReduced = [];
-    var remaining = formula.map(f => f.map(r => r));
+    var remaining = formula.map(f => f.map(r => frac(r)));
 
     for (var pos = 0; pos < formula[0].length-1; pos++) {
-        var fi = remaining.findIndex(f => f.slice(0, pos).every(v => v == 0) && f[pos] != 0);
+        var fi = remaining.findIndex(f => f.slice(0, pos).every(v => isZero(v)) && nonZero(f[pos]));
         if (fi >= 0) {
             var f = remaining.splice(fi, 1);
             f = f[0];
 
-            if (f[pos] != 1) {
-                f = multiply(f, 1 / f[pos]);
+            if (!isOne(f[pos])) {
+                f = multiply(f, inv(f[pos]));
             }
 
             remaining = remaining.map(r => {
@@ -220,16 +195,14 @@ function solve(i) {
         rowReduced.push(r);
     });
 
-    rowReduced = rowReduced.filter(rr => !rr.every(r => r == 0));
-
-    console.log(rowReduced);
+    rowReduced = rowReduced.filter(rr => !rr.every(r => isZero(r)));
 
     var formulaByVariable = {};
     var dependentVariables = [];
 
     rowReduced.forEach(rr => {
-        dependentVariables.push(rr.findIndex(r => r == 1));
-        formulaByVariable[rr.findIndex(r => r == 1)] = rr;
+        dependentVariables.push(rr.findIndex(r => isOne(r)));
+        formulaByVariable[rr.findIndex(r => isOne(r))] = rr;
     })
 
     var freeVariables = formula[0].slice(0, -1).map((_, j) => j);
@@ -238,16 +211,13 @@ function solve(i) {
     var maxValues = [];
 
     freeVariables.forEach(fv => {
-        maxValues.push(maxForFreeValues(formula, fv));
-        //maxValues.push(rangeOfValueGivenValues(rowReduced, fv));
+        maxValues.push(maxForFreeValues(formula, formula[0].slice(0, -1), fv));
     });
-
 
     var total = maxValues.reduce((a, c) => a * (c+1), 1);
 
     console.log('free vars', freeVariables);
     console.log('max vals ', maxValues);
-    console.log('fbv', formulaByVariable);
 
     var bestSolution = Number.MAX_SAFE_INTEGER;
 
@@ -272,14 +242,18 @@ function solve(i) {
     return bestSolution;
 }
 
+function searchFreeVariables(i, formula, formulaByVariable, values, freeVariablesRemaining) {
+    if (freeVariablesRemaining.length == 0) {
+        return evaluate(i, formulaByVariable, variables);
+    }
+}
+
 
 var total = 0;
 
 for(var i = 0; i < problems.length; i++) {
     var v = solve(i);
     console.log('ANSWER', i, v);
-
-    //fs.appendFileSync('p2lpanswers.txt', i + '\t' + v + '\r\n');
 
     total += v;
 }
