@@ -73,7 +73,7 @@ function search(i, buttons) {
         // found a solution or dead end
         if (minPushes < (best[i] || Number.MAX_SAFE_INTEGER)) {
             best[i] = minPushes;
-            console.log(i, minPushes);
+            console.log(i, minPushes, newButtons.map(n => n[0]));
         }
         return minPushes;
     }
@@ -151,6 +151,7 @@ for(var i = 0; i < problems.length; i++) {
     var v = search(i, buttons);
     console.log('ANSWER', i, v);
     console.log('STATS searches:', searches);
+
     total += v;
 }
 

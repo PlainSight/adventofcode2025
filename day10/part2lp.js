@@ -23,13 +23,6 @@ problems.forEach(p => {
     // for each value we can calculate the maximum number of presses for a set of buttons
 });
 
-function subtract(r1, r2, mult) {
-    // subtract r2 from r1
-    return r1.map((v, i) => {
-        return fsub(v, fmult(mult, r2[i]));
-    })
-}
-
 function multiply(r1, mult) {
     return r1.map(v => fmult(v, mult));
 }
@@ -38,7 +31,9 @@ function eliminate(r1, r2, pos) {
     // r2 must be a pre-eliminated row with r2[pos] == 1
     if (nonZero(r1[pos])) {
         var mult = r1[pos];
-        return subtract(r1, r2, mult);
+        return r1.map((v, i) => {
+            return fsub(v, fmult(mult, r2[i]));
+        });
     } else {
         return r1;
     }
@@ -49,13 +44,20 @@ function maxForFreeValues(formula, values, index) {
     var maxValue = Number.MAX_SAFE_INTEGER;
 
     releventFormula.forEach(rf => {
-        var value = rf[rf.length-1];
-        if (value < maxValue) {
+        var left = rf.slice(0, -1).reduce((a, c, ci) => {
+            return a + c*Math.max(values[ci], 0);
+        }, 0);
+
+        var right = rf[rf.length-1];
+
+        var value = right - left;
+
+        if (value >= 0 && value < maxValue) {
             maxValue = value;
         }
     });
 
-    return Math.round(maxValue);
+    return maxValue;
 }
 
 function calculateDependentVariables(formulaByVariable, variables) {
@@ -89,7 +91,7 @@ function evaluate(i, formulaByVariable, freeVariables) {
 
     var pushes = variables.reduce((a, c) => a + c, 0);
 
-    console.log('ans', i, pushes);
+    //console.log('ans', i, pushes);
     return pushes;
 }
 
@@ -105,7 +107,7 @@ function fmult(a, b) {
         n: a.n * b.n,
         d: a.d * b.d
     };
-    return simplify(res); 
+    return simplify(res);
 }
 
 function fadd(a, b) {
@@ -140,11 +142,11 @@ function isZero(a) {
 }
 
 function isOne(a) {
-    return (a.n == 1 && a.d == 1);
+    return a.n == 1 && a.d == 1;
 }
 
 function nonZero(a) {
-    return (a.n != 0);
+    return a.n != 0;
 }
 
 function simplify(a) {
@@ -155,10 +157,12 @@ function simplify(a) {
 }
 
 function gcd(a, b) {
-    if (b == 0) {
-        return a;
+    while (b !== 0) {
+        let temp = b;
+        b = a % b;
+        a = temp;
     }
-    return gcd(b, a % b); 
+    return a;
 }
 
 function solve(i) {
@@ -208,44 +212,31 @@ function solve(i) {
     var freeVariables = formula[0].slice(0, -1).map((_, j) => j);
     freeVariables = freeVariables.filter(fv => !dependentVariables.includes(fv));
 
-    var maxValues = [];
-
-    freeVariables.forEach(fv => {
-        maxValues.push(maxForFreeValues(formula, formula[0].slice(0, -1), fv));
-    });
-
-    var total = maxValues.reduce((a, c) => a * (c+1), 1);
-
-    console.log('free vars', freeVariables);
-    console.log('max vals ', maxValues);
-
-    var bestSolution = Number.MAX_SAFE_INTEGER;
-
-    for(var t = 0; t < total; t++) {
-        var variables = formula[0].slice(0, -1).map(_ => 0);
-
-        var remainder = t;
-
-        freeVariables.forEach((fv, i) => {
-            var mod = maxValues[i]+1;
-            var v = remainder % mod;
-            remainder = Math.floor(remainder / mod);
-            variables[fv] = v;
-        });
-
-        var score = evaluate(i, formulaByVariable, variables);
-        if (score < bestSolution) {
-            bestSolution = score;
-        }
-    }
-
-    return bestSolution;
+    return searchFreeVariables(i, formula, formulaByVariable, formula[0].slice(0, -1).map(_ => 0), freeVariables);
 }
 
 function searchFreeVariables(i, formula, formulaByVariable, values, freeVariablesRemaining) {
     if (freeVariablesRemaining.length == 0) {
-        return evaluate(i, formulaByVariable, variables);
+        return evaluate(i, formulaByVariable, values);
     }
+
+    var topFreeVariable = freeVariablesRemaining[0];
+    var fvr = freeVariablesRemaining.slice(1);
+
+    var maxVal = maxForFreeValues(formula, values, topFreeVariable);
+
+    var bestScore = Number.MAX_SAFE_INTEGER;
+
+    for(var x = 0; x <= maxVal; x++) {
+        var newValues = values.map(v => v);
+        newValues[topFreeVariable] = x;
+        var score = searchFreeVariables(i, formula, formulaByVariable, newValues, fvr);
+        if (score < bestScore) {
+            bestScore = score;
+        }
+    }
+
+    return bestScore;
 }
 
 
