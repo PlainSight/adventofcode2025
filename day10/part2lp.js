@@ -211,6 +211,9 @@ function solve(i) {
 
     var freeVariables = formula[0].slice(0, -1).map((_, j) => j);
     freeVariables = freeVariables.filter(fv => !dependentVariables.includes(fv));
+    // freeVariables.sort((a, b) => {
+    //     return problems[i].wirings[a].length - problems[i].wirings[b].length;
+    // });
 
     return searchFreeVariables(i, formula, formulaByVariable, formula[0].slice(0, -1).map(_ => 0), freeVariables);
 }
@@ -231,6 +234,7 @@ function searchFreeVariables(i, formula, formulaByVariable, values, freeVariable
         var newValues = values.map(v => v);
         newValues[topFreeVariable] = x;
         var score = searchFreeVariables(i, formula, formulaByVariable, newValues, fvr);
+
         if (score < bestScore) {
             bestScore = score;
         }
