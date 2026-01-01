@@ -36,11 +36,9 @@ func eliminate(target []frac.Fraction, reducer []frac.Fraction, position int) []
 	return result
 }
 
-func generateRowReducedMatrix(problemId int) [][]frac.Fraction {
+func generateRowReducedMatrix(problemId int) ([][]frac.Fraction, []int) {
 	var rowReduced [][]frac.Fraction
 	var remaining [][]frac.Fraction
-
-	fmt.Printf("PROBLEM: %v\n", problems[problemId])
 
 	for i, ml := range problems[problemId].relatedButtons {
 		fractionalised := make([]frac.Fraction, len(problems[problemId].wirings))
@@ -56,11 +54,16 @@ func generateRowReducedMatrix(problemId int) [][]frac.Fraction {
 		remaining = append(remaining, fractionalised)
 	}
 
-	for pos := 0; len(remaining) > 0 && pos < len(remaining[0])-1; pos++ {
+	var independentVariables []int
+
+	variableCount := len(remaining[0]) - 1
+
+	for pos := 0; pos < variableCount; pos++ {
 		topIndex := slices.IndexFunc(remaining, func(fr []frac.Fraction) bool {
 			return fr[pos].Numerator() != 0
 		})
 		if topIndex == -1 {
+			independentVariables = append(independentVariables, pos)
 			continue
 		}
 		topRow := remaining[topIndex]
@@ -94,16 +97,66 @@ func generateRowReducedMatrix(problemId int) [][]frac.Fraction {
 		rowReduced = append(rowReduced, topRow)
 	}
 
-	fmt.Printf("%d %v\n", problemId, rowReduced)
+	for _, r := range remaining {
+		rowReduced = append(rowReduced, r)
+	}
 
-	//v, _ := frac.New(5, 1)
-	return nil
+	var mappedRowReduced [][]frac.Fraction
+
+	rrIndex := 0
+	for n := range variableCount {
+		if rrIndex < len(rowReduced) && rowReduced[rrIndex][n].Numerator() != 0 {
+			mappedRowReduced = append(mappedRowReduced, rowReduced[rrIndex])
+			rrIndex++
+		} else {
+			mappedRowReduced = append(mappedRowReduced, nil)
+		}
+	}
+
+	if len(independentVariables) > 0 {
+		fmt.Printf("%d\n%v\n%v\n\n", problemId, mappedRowReduced, independentVariables)
+	}
+
+	return mappedRowReduced, independentVariables
+}
+
+func maxValuesForIndependentVariables(problemId int, variables []int, index int) int {
+	max := 1000
+	for i, rb := range problems[problemId].relatedButtons {
+		if slices.Index(rb, index) != -1 {
+			// left side of equation
+			left := 0
+			for rbci, rbc := range rb {
+				if variables[rbci] > 0 {
+					left += rbc * variables[rbci]
+				}
+			}
+			// right side of equation
+			right := problems[problemId].joltages[i]
+
+			value := right - left
+
+			if value < max {
+				max = value
+			}
+		}
+	}
+
+	return max
+}
+
+func searchIndependentVariables(problemId int, mappedRowReduced [][]frac.Fraction, values []int, freeRemaining []int) int {
+	maxValues := maxValuesForIndependentVariables(problemId, values)
+
 }
 
 func solve(i int) int {
-	rrm := generateRowReducedMatrix(i)
+	rrm, iv := generateRowReducedMatrix(i)
 
-	return len(rrm)
+	values := make([]int, len(problems[i].wirings))
+	score := searchIndependentVariables(i, rrm, values, iv)
+
+	return score
 }
 
 func main() {
@@ -116,9 +169,7 @@ func main() {
 
 	lines := strings.Split(input, "\r\n")
 
-	fmt.Println(lines[0])
-
-	for i, l := range lines {
+	for _, l := range lines {
 		lineParts := strings.Split(l, " ")
 		wiringStrings := lineParts[1 : len(lineParts)-1]
 		var wirings [][]int
@@ -141,7 +192,7 @@ func main() {
 		}
 
 		var relatedButtons [][]int
-		for j, _ := range joltages {
+		for j := range joltages {
 			var relatedButtonsToJoltage []int
 		outer:
 			for wi, w := range wirings {
@@ -161,7 +212,7 @@ func main() {
 			relatedButtons: relatedButtons,
 		}
 
-		fmt.Printf("%d\n%v\n%v\n%v\n\n", i, wirings, joltages, relatedButtons)
+		//fmt.Printf("%d\n%v\n%v\n%v\n\n", i, wirings, joltages, relatedButtons)
 
 		problems = append(problems, p)
 	}

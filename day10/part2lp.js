@@ -172,6 +172,7 @@ function solve(i) {
 
     var rowReduced = [];
     var remaining = formula.map(f => f.map(r => frac(r)));
+    var freeVariables = [];
 
     for (var pos = 0; pos < formula[0].length-1; pos++) {
         var fi = remaining.findIndex(f => f.slice(0, pos).every(v => isZero(v)) && nonZero(f[pos]));
@@ -192,6 +193,8 @@ function solve(i) {
             });
 
             rowReduced.push(f);
+        } else {
+            freeVariables.push(pos);
         }
     }
 
@@ -202,15 +205,11 @@ function solve(i) {
     rowReduced = rowReduced.filter(rr => !rr.every(r => isZero(r)));
 
     var formulaByVariable = {};
-    var dependentVariables = [];
 
     rowReduced.forEach(rr => {
-        dependentVariables.push(rr.findIndex(r => isOne(r)));
         formulaByVariable[rr.findIndex(r => isOne(r))] = rr;
     })
 
-    var freeVariables = formula[0].slice(0, -1).map((_, j) => j);
-    freeVariables = freeVariables.filter(fv => !dependentVariables.includes(fv));
     // freeVariables.sort((a, b) => {
     //     return problems[i].wirings[a].length - problems[i].wirings[b].length;
     // });
