@@ -36,7 +36,16 @@ func eliminate(target []frac.Fraction, reducer []frac.Fraction, position int) []
 	return result
 }
 
-func generateRowReducedMatrix(problemId int) ([][]frac.Fraction, []int) {
+type iterConstraint struct {
+	step         int
+	offset       int
+	modulo       int
+	contributors []int
+	contribution []int
+	// add contributors counters, mod by modulo, then must equal offset
+}
+
+func generateRowReducedMatrix(problemId int) ([][]frac.Fraction, []int, map[int]iterConstraint) {
 	var rowReduced [][]frac.Fraction
 	var remaining [][]frac.Fraction
 
@@ -105,14 +114,93 @@ func generateRowReducedMatrix(problemId int) ([][]frac.Fraction, []int) {
 	rrIndex := 0
 	for n := range variableCount {
 		if rrIndex < len(rowReduced) && rowReduced[rrIndex][n].Numerator() != 0 {
-			mappedRowReduced = append(mappedRowReduced, rowReduced[rrIndex])
+			var simplifiedRow []frac.Fraction
+			for _, r := range rowReduced[rrIndex] {
+				simplified, _ := frac.New(r.Numerator(), r.Denominator())
+				simplifiedRow = append(simplifiedRow, simplified)
+			}
+			mappedRowReduced = append(mappedRowReduced, simplifiedRow)
 			rrIndex++
 		} else {
 			mappedRowReduced = append(mappedRowReduced, make([]frac.Fraction, variableCount+1))
 		}
 	}
 
-	return mappedRowReduced, independentVariables
+	independentVariableSteps := make(map[int]iterConstraint)
+
+	for _, row := range mappedRowReduced {
+		fractionalValueCoefficient := row[len(row)-1]
+		var variableFractionalCoefficients []frac.Fraction
+		var variableFractionalIndexes []int
+
+		for i, col := range row {
+			if i != len(row)-1 {
+				if col.Denominator() != 1 && col.Denominator() != 0 {
+					if slices.Index(independentVariables, i) != -1 {
+						variableFractionalIndexes = append(variableFractionalIndexes, i)
+						variableFractionalCoefficients = append(variableFractionalCoefficients, col)
+					}
+				}
+			}
+		}
+
+		if len(variableFractionalIndexes) > 0 {
+
+			lcmOfAll := int(fractionalValueCoefficient.Denominator())
+			for _, v := range variableFractionalCoefficients {
+				lcmOfAll = lcm(lcmOfAll, int(v.Denominator()))
+			}
+
+			scaleToLCM := func(a frac.Fraction) int {
+				topScaler := lcmOfAll / int(a.Denominator())
+				return topScaler * int(a.Numerator())
+			}
+
+			topScaler := lcmOfAll / int(fractionalValueCoefficient.Denominator())
+			target := topScaler * int(fractionalValueCoefficient.Numerator()%fractionalValueCoefficient.Denominator())
+
+			var contributions []int
+
+			for i, _ := range variableFractionalIndexes {
+				variable := scaleToLCM(variableFractionalCoefficients[i])
+				contributions = append(contributions, variable)
+			}
+
+			for i, vfi := range variableFractionalIndexes {
+				variable := scaleToLCM(variableFractionalCoefficients[i])
+				if variable < 0 {
+					variable = -variable
+				}
+
+				ic := iterConstraint{
+					step:         lcmOfAll,
+					modulo:       lcmOfAll,
+					offset:       target,
+					contributors: variableFractionalIndexes,
+					contribution: contributions,
+				}
+
+				independentVariableSteps[vfi] = ic
+			}
+		}
+	}
+
+	return mappedRowReduced, independentVariables, independentVariableSteps
+}
+
+func lcm(n1, n2 int) int {
+	// Put the largest number in n2 because it's divided first, avoiding overflows in some cases
+	if n1 > n2 {
+		n1, n2 = n2, n1
+	}
+	return n1 * (n2 / gcd(n1, n2))
+}
+
+func gcd(n1, n2 int) int {
+	for n2 != 0 {
+		n1, n2 = n2, n1%n2
+	}
+	return n1
 }
 
 func maxValueForIndependentVariable(problemId int, variables []int, index int) int {
@@ -140,23 +228,55 @@ func maxValueForIndependentVariable(problemId int, variables []int, index int) i
 	return max
 }
 
-func searchIndependentVariables(problemId int, mappedRowReduced [][]frac.Fraction, variables []int, freeRemaining []int) int {
-	if len(freeRemaining) == 0 {
+func searchIndependentVariables(problemId int, mappedRowReduced [][]frac.Fraction, variables []int, freeRemaining []int, freePos int, iterConstraint map[int]iterConstraint) int {
+	if freePos == len(freeRemaining) {
 		return evaluate(mappedRowReduced, variables)
 	}
 
-	topFreeVariable := freeRemaining[0]
+	topFreeVariable := freeRemaining[freePos]
 
 	maxValue := maxValueForIndependentVariable(problemId, variables, topFreeVariable)
 
 	bestScore := 1000
 
-	for x := 0; x <= maxValue; x++ {
+	offset := 0
+	increment := 1
+
+	constraint, ok := iterConstraint[topFreeVariable]
+
+	if ok && freePos == (len(freeRemaining)-1) {
+		increment = constraint.step
+
+		existingContribution := 0
+
+		topNumerator := 1
+
+		for i, c := range constraint.contributors {
+			if c == topFreeVariable {
+				topNumerator = constraint.contribution[i]
+			}
+			existingContribution += (variables[c] * constraint.contribution[i])
+		}
+
+		makePos := func(a int, b int) int {
+			return (a%b + b) % b
+		}
+
+		existingContribution = makePos(existingContribution, constraint.modulo)
+
+		for i := 0; i < increment; i++ {
+			if makePos(((topNumerator*i)+existingContribution), constraint.modulo) == makePos(constraint.offset, constraint.modulo) {
+				offset = i
+			}
+		}
+	}
+
+	for x := offset; x <= maxValue; x += increment {
 		newVariables := make([]int, len(variables))
 		copy(newVariables, variables)
 		newVariables[topFreeVariable] = x
 
-		score := searchIndependentVariables(problemId, mappedRowReduced, newVariables, freeRemaining[1:])
+		score := searchIndependentVariables(problemId, mappedRowReduced, newVariables, freeRemaining, freePos+1, iterConstraint)
 
 		if score < bestScore {
 			bestScore = score
@@ -215,10 +335,10 @@ func evaluate(mappedRowReduce [][]frac.Fraction, variables []int) int {
 }
 
 func solve(i int) int {
-	rrm, iv := generateRowReducedMatrix(i)
+	rrm, iv, ic := generateRowReducedMatrix(i)
 
 	values := make([]int, len(problems[i].wirings))
-	score := searchIndependentVariables(i, rrm, values, iv)
+	score := searchIndependentVariables(i, rrm, values, iv, 0, ic)
 
 	return score
 }
